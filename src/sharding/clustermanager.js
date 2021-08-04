@@ -116,7 +116,9 @@ class ClusterManager extends EventEmitter {
         if (clusterToRequest) {
             let c = clusterToRequest[1];
 
-            c.send({ name: "stats" });
+            c.send({
+                name: "stats"
+            });
 
             this.executeStats(clusters, start + 1);
         }
@@ -153,7 +155,9 @@ class ClusterManager extends EventEmitter {
             this.connectShards();
         } else {
             let worker = master.fork();
-            this.clusters.set(clusterID, { workerID: worker.id });
+            this.clusters.set(clusterID, {
+                workerID: worker.id
+            });
             this.workers.set(worker.id, clusterID);
             logger.info("Cluster Manager", `Launching cluster ${clusterID}`);
             clusterID += 1;
@@ -187,7 +191,9 @@ class ClusterManager extends EventEmitter {
                 logger.info("Cluster Manager", `Starting ${this.shardCount} shards in ${this.clusterCount} clusters`);
 
                 let embed = {
-                    title: `Starting ${this.shardCount} shards in ${this.clusterCount} clusters`
+                    title: `Iniciando ${this.shardCount} shards en ${this.clusterCount} grupos.`,
+                    color: "GREEN",
+                    timestamp: ""
                 }
 
                 this.sendWebhook("cluster", embed);
@@ -307,7 +313,11 @@ class ClusterManager extends EventEmitter {
                         let cluster = this.clusters.get(callback);
 
                         if (cluster) {
-                            master.workers[cluster.workerID].send({ name: "fetchReturn", id: message.value.id, value: message.value });
+                            master.workers[cluster.workerID].send({
+                                name: "fetchReturn",
+                                id: message.value.id,
+                                value: message.value
+                            });
                             this.callbacks.delete(message.value.id);
                         }
                         break;
@@ -321,7 +331,9 @@ class ClusterManager extends EventEmitter {
                         let response;
                         let error;
 
-                        let { method, url, auth, body, file, _route } = message;
+                        let {
+                            method, url, auth, body, file, _route
+                        } = message;
 
                         if (file && file.file) file.file = Buffer.from(file.file, 'base64');
 
@@ -330,7 +342,7 @@ class ClusterManager extends EventEmitter {
                             response = this.bot.rest.request(method, url, {
                                 auth,
                                 route: _route,
-                                files: [ file ],
+                                files: [file],
                                 data: body,
                             })
                         } catch (err) {
@@ -342,9 +354,15 @@ class ClusterManager extends EventEmitter {
                         }
 
                         if (error) {
-                            this.sendTo(clusterID, { _eventName: `apiResponse.${message.requestID}`, err: error })
+                            this.sendTo(clusterID, {
+                                _eventName: `apiResponse.${message.requestID}`,
+                                err: error
+                            })
                         } else {
-                            this.sendTo(clusterID, { _eventName: `apiResponse.${message.requestID}`, data: response });
+                            this.sendTo(clusterID, {
+                                _eventName: `apiResponse.${message.requestID}`,
+                                data: response
+                            });
                         }
 
                         break;
@@ -354,7 +372,7 @@ class ClusterManager extends EventEmitter {
 
         master.on('disconnect', (worker) => {
             const clusterID = this.workers.get(worker.id);
-            logger.warn("Cluster Manager", `cluster ${clusterID} disconnected`);
+            logger.warn("Cluster Manager", `El grupo ${clusterID} se ha desconectado.`);
         });
 
         master.on('exit', (worker, code, signal) => {
@@ -440,7 +458,9 @@ class ClusterManager extends EventEmitter {
         let token = this.webhooks[type].token;
         embed.timestamp = new Date();
         if (id && token) {
-            new Discord.WebhookClient(id, token).send({ embeds: [embed] })
+            new Discord.WebhookClient(id, token).send({
+                embeds: [embed]
+            })
         }
     }
 
@@ -454,22 +474,22 @@ class ClusterManager extends EventEmitter {
                 padding: 5,
                 margin: 2
             })
-                .emptyLine()
-                .right(`discord.js-cluster ${pkg.version}`)
-                .emptyLine()
-                .render()
+            .emptyLine()
+            .right(`discord.js-cluster ${pkg.version}`)
+            .emptyLine()
+            .render()
         );
     }
 
     restartCluster(worker, code, signal) {
         const clusterID = this.workers.get(worker.id);
 
-        logger.warn("Cluster Manager", `cluster ${clusterID} died`);
+        logger.warn("Cluster Manager", `El grupo ${clusterID} se ha desconectado.`);
 
         let cluster = this.clusters.get(clusterID);
 
         let embed = {
-            title: `Cluster ${clusterID} died with code ${code}. Restarting...`,
+            title: `El grupo ${clusterID}  se ha desconectado con el código de error ${code}. Reiniciando...`,
             description: `Shards ${cluster.firstShardID} - ${cluster.lastShardID}`
         }
 
@@ -481,14 +501,17 @@ class ClusterManager extends EventEmitter {
 
         this.workers.delete(worker.id);
 
-        this.clusters.set(clusterID, Object.assign(cluster, { workerID: newWorker.id }));
+        this.clusters.set(clusterID, Object.assign(cluster, {
+            workerID: newWorker.id
+        }));
 
         this.workers.set(newWorker.id, clusterID);
 
-        logger.debug("Cluster Manager", `Restarting cluster ${clusterID}`);
+        logger.debug("Cluster Manager", `Reiniciando el grupo ${clusterID}`);
 
         this.queue.queueItem({
-            item: clusterID, value: {
+            item: clusterID,
+            value: {
                 id: clusterID,
                 clusterCount: this.clusterCount,
                 name: "connect",
@@ -520,7 +543,10 @@ class ClusterManager extends EventEmitter {
     fetchInfo(start, type, value) {
         let cluster = this.clusters.get(start);
         if (cluster) {
-            master.workers[cluster.workerID].send({ name: type, value: value });
+            master.workers[cluster.workerID].send({
+                name: type,
+                value: value
+            });
             this.fetchInfo(start + 1, type, value);
         }
     }
