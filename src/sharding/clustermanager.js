@@ -521,7 +521,7 @@ class ClusterManager extends EventEmitter {
     }
 
     async calculateShards() {
-        const shards = await Discord.Util.fetchRecommendedShards(this.token, 1000);
+       const shards = await Discord.Util.fetchRecommendedShards(this.token, { guildsPerShard: 1000 });
 
         console.log(shards)
         if (shards === 1) {
@@ -545,8 +545,8 @@ class ClusterManager extends EventEmitter {
         }
     }
 
-    broadcast(message, clusterId) {
-        if (clusterId == Infinity || clusterId > 0) return [...this.clusters.keys()].forEach(id => this.broadcast(message, id));
+    broadcast(message, clusterId = -1) {
+        if (clusterId == Infinity || clusterId < 0) return [...this.clusters.keys()].forEach(id => this.broadcast(message, id));
         let cluster = this.clusters.get(clusterId);
         if (cluster) master.workers[cluster.workerID].send(message);
     }
