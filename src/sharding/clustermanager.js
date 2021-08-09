@@ -74,8 +74,6 @@ class ClusterManager extends EventEmitter {
         }
 
         if (this.token) {
-            this.bot = new this.client();
-            this.bot.token = this.token;
             this.launch(false);
         } else {
             throw new Error("No token provided");
@@ -99,7 +97,6 @@ class ClusterManager extends EventEmitter {
                 this.stats.clustersCounted = 0;
 
                 let clusters = Object.entries(master.workers);
-
                 this.executeStats(clusters, 0);
             }, this.statsInterval);
         }
@@ -115,11 +112,9 @@ class ClusterManager extends EventEmitter {
         const clusterToRequest = clusters.filter(c => c[1].state === 'online')[start];
         if (clusterToRequest) {
             let c = clusterToRequest[1];
-
             c.send({
                 name: "stats"
             });
-
             this.executeStats(clusters, start + 1);
         }
     }
@@ -154,7 +149,7 @@ class ClusterManager extends EventEmitter {
 
             this.connectShards();
         } else {
-            let worker = master.fork();
+            let worker = master.fork({ SHARDING_MANAGER: true });
             this.clusters.set(clusterID, {
                 workerID: worker.id
             });
@@ -206,7 +201,7 @@ class ClusterManager extends EventEmitter {
                 this.start(0);
             });
         } else if (master.isWorker) {
-            const Cluster = new cluster(this.client);
+            const Cluster = new cluster(this.client, { debug: this.options.debug });
             Cluster.spawn();
         }
 
@@ -439,7 +434,6 @@ class ClusterManager extends EventEmitter {
         }
 
         logger.info("Cluster Manager", `All shards spread`);
-
         if (this.stats) {
             this.startStats();
         }
@@ -475,7 +469,7 @@ class ClusterManager extends EventEmitter {
                 margin: 2
             })
             .emptyLine()
-            .right(`discord.js-cluster ${pkg.version}`)
+            .right(`Node Bot `)
             .emptyLine()
             .render()
         );
@@ -497,7 +491,7 @@ class ClusterManager extends EventEmitter {
 
         let shards = cluster.shardCount;
 
-        let newWorker = master.fork();
+        let newWorker = master.fork({ SHARDING_MANAGER: true });
 
         this.workers.delete(worker.id);
 
@@ -528,7 +522,7 @@ class ClusterManager extends EventEmitter {
     }
 
     async calculateShards() {
-        const shards = await Discord.Util.fetchRecommendedShards(this.token, 1000);
+        const shards = await Discord.Util.fetchRecommendedShards(this.token, { guildsPerShard: 1000 });
 
         if (shards === 1) {
             return Promise.resolve(shards);

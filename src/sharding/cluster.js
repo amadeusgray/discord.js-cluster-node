@@ -19,7 +19,7 @@ class Cluster {
 	 * Creates an instance of Cluster.
 	 * @memberof Cluster
 	 */
-	constructor(client) {
+	constructor(client, { debug }) {
 
 		this.shards = 0;
 		this.maxShards = 0;
@@ -38,6 +38,7 @@ class Cluster {
 		this.app = null;
 		this.bot = null;
 		this.test = false;
+		this.debug = debug;
 		/** @private */
 		this._client = client;
 
@@ -238,6 +239,8 @@ class Cluster {
 		//     timeout: this.bot.options.requestTimeout
 		// });
 
+		if (this.debug) bot.on('debug', console.debug);
+
 		bot.on("connect", id => {
 			process.send({
 				name: "log",
@@ -269,37 +272,35 @@ class Cluster {
 			});
 		});
 
+		let index = {}
 		bot.on("shardReconnecting", id => {
-			process.send({
-				name: "log",
-				msg: `La shard ${id} se está reconectando.`
-			});
-			let embed = {
-				title: "Reconexión <:connectionbad:863983092792426516>",
-				description: `La shard ${id} se está reconectando.`,
-				color: "ORANGE",
-				timestamp: ""
+			if (index[id]) {
+				process.send({
+					name: "log",
+					msg: `La shard ${id} se está reconectando por ${index[id]} vez.`
+				});
+				index[id] += 1
+			} else {
+				process.send({
+					name: "log",
+					msg: `La shard ${id} se está reconectando.`
+				});
+				index[id] = 1
 			}
-			process.send({
-				name: "shard",
-				embed: embed
-			});
+			if (index[id] == 5) {
+				process.send({
+					name: "log",
+					msg: `La shard ${id} se está reiniciando por un cúmulo de reconexiones.`
+				});
+				this.ipc.sendTo(id, "restart", { name: "restart" });
+				index[id] = 0
+			}
 		});
 
 		bot.on("shardResume", id => {
 			process.send({
 				name: "log",
 				msg: `La shard ${id} vuelve a estar operativa.`
-			});
-			let embed = {
-				title: "Conexión Resumida <:connectionexcellent:863983092845772831>",
-				description: `La shard ${id} vuelve a estar operativa.`,
-				color: "GREEN",
-				timestamp: ""
-			}
-			process.send({
-				name: "shard",
-				embed: embed
 			});
 		});
 
