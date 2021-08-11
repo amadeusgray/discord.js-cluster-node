@@ -46,7 +46,7 @@ class ClusterManager extends EventEmitter {
 
         this.statsInterval = options.statsInterval || 60 * 1000;
         this.mainFile = mainFile;
-        this.name = options.name || "DiscordJS-Sharder";
+        this.name = options.name || "Node";
         this.guildsPerShard = options.guildsPerShard || 1300;
 
         this.webhooks = Object.assign({
@@ -97,6 +97,7 @@ class ClusterManager extends EventEmitter {
                 this.stats.clustersCounted = 0;
 
                 let clusters = Object.entries(master.workers);
+
                 this.executeStats(clusters, 0);
             }, this.statsInterval);
         }
@@ -109,12 +110,12 @@ class ClusterManager extends EventEmitter {
      * @memberof ClusterManager
      */
     executeStats(clusters, start) {
-        const clusterToRequest = clusters.filter(c => c[1].state === 'online')[start];
+        const clusterToRequest = clusters.filter(c => c[1].isConnected())[start];
         if (clusterToRequest) {
             let c = clusterToRequest[1];
-            c.send({
-                name: "stats"
-            });
+
+            c.send({ name: "stats" });
+
             this.executeStats(clusters, start + 1);
         }
     }
@@ -128,7 +129,7 @@ class ClusterManager extends EventEmitter {
      */
     start(clusterID) {
         if (clusterID === this.clusterCount) {
-            logger.info("Cluster Manager", "Clusters have been launched!");
+            logger.info("Cluster Manager", "Clusters lanzados!");
 
             let shards = [];
 
@@ -150,11 +151,9 @@ class ClusterManager extends EventEmitter {
             this.connectShards();
         } else {
             let worker = master.fork({ SHARDING_MANAGER: true });
-            this.clusters.set(clusterID, {
-                workerID: worker.id
-            });
+            this.clusters.set(clusterID, { workerID: worker.id });
             this.workers.set(worker.id, clusterID);
-            logger.info("Cluster Manager", `Launching cluster ${clusterID}`);
+            logger.info("Cluster Manager", `Iniciando cluster ${clusterID}`);
             clusterID += 1;
 
             this.start(clusterID);
@@ -183,12 +182,10 @@ class ClusterManager extends EventEmitter {
 
                 if (this.lastShardID === 0) this.lastShardID = this.shardCount - 1;
 
-                logger.info("Cluster Manager", `Starting ${this.shardCount} shards in ${this.clusterCount} clusters`);
+                logger.info("Cluster Manager", `Iniciando ${this.shardCount} shards en ${this.clusterCount} clusters`);
 
                 let embed = {
-                    title: `Iniciando ${this.shardCount} shards en ${this.clusterCount} grupos.`,
-                    color: "GREEN",
-                    timestamp: ""
+                    title: `Iniciando ${this.shardCount} shards en ${this.clusterCount} clusters`
                 }
 
                 this.sendWebhook("cluster", embed);
@@ -307,11 +304,7 @@ class ClusterManager extends EventEmitter {
                         let cluster = this.clusters.get(callback);
 
                         if (cluster) {
-                            master.workers[cluster.workerID].send({
-                                name: "fetchReturn",
-                                id: message.value.id,
-                                value: message.value
-                            });
+                            master.workers[cluster.workerID].send({ name: "fetchReturn", id: message.value.id, value: message.value });
                             this.callbacks.delete(message.value.id);
                         }
                         break;
@@ -325,9 +318,7 @@ class ClusterManager extends EventEmitter {
                         let response;
                         let error;
 
-                        let {
-                            method, url, auth, body, file, _route
-                        } = message;
+                        let { method, url, auth, body, file, _route } = message;
 
                         if (file && file.file) file.file = Buffer.from(file.file, 'base64');
 
@@ -336,7 +327,7 @@ class ClusterManager extends EventEmitter {
                             response = this.bot.rest.request(method, url, {
                                 auth,
                                 route: _route,
-                                files: [file],
+                                files: [ file ],
                                 data: body,
                             })
                         } catch (err) {
@@ -348,15 +339,9 @@ class ClusterManager extends EventEmitter {
                         }
 
                         if (error) {
-                            this.sendTo(clusterID, {
-                                _eventName: `apiResponse.${message.requestID}`,
-                                err: error
-                            })
+                            this.sendTo(clusterID, { _eventName: `apiResponse.${message.requestID}`, err: error })
                         } else {
-                            this.sendTo(clusterID, {
-                                _eventName: `apiResponse.${message.requestID}`,
-                                data: response
-                            });
+                            this.sendTo(clusterID, { _eventName: `apiResponse.${message.requestID}`, data: response });
                         }
 
                         break;
@@ -366,7 +351,7 @@ class ClusterManager extends EventEmitter {
 
         master.on('disconnect', (worker) => {
             const clusterID = this.workers.get(worker.id);
-            logger.warn("Cluster Manager", `El grupo ${clusterID} se ha desconectado.`);
+            logger.warn("Cluster Manager", `El cluster ${clusterID} se desconectó`);
         });
 
         master.on('exit', (worker, code, signal) => {
@@ -432,7 +417,8 @@ class ClusterManager extends EventEmitter {
             });
         }
 
-        logger.info("Cluster Manager", `All shards spread`);
+        logger.info("Cluster Manager", `Todas las shards están listas`);
+
         if (this.stats) {
             this.startStats();
         }
@@ -451,9 +437,7 @@ class ClusterManager extends EventEmitter {
         let token = this.webhooks[type].token;
         embed.timestamp = new Date();
         if (id && token) {
-            new Discord.WebhookClient(id, token).send({
-                embeds: [embed]
-            })
+            new Discord.WebhookClient({id, token}).send({ embeds: [embed] })
         }
     }
 
@@ -467,10 +451,10 @@ class ClusterManager extends EventEmitter {
                 padding: 5,
                 margin: 2
             })
-            .emptyLine()
-            .right(`Node Bot `)
-            .emptyLine()
-            .render()
+                .emptyLine()
+                .right(`discord.js-cluster modeado para Node ${pkg.version}`)
+                .emptyLine()
+                .render()
         );
     }
 
@@ -481,7 +465,7 @@ class ClusterManager extends EventEmitter {
 
         let cluster = this.clusters.get(clusterID);
 
-        let embed = {
+         let embed = {
             title: `El grupo ${clusterID}  se ha desconectado con el código de error ${code}. Reiniciando...`,
             description: `Shards ${cluster.firstShardID} - ${cluster.lastShardID}`
         }
@@ -494,17 +478,14 @@ class ClusterManager extends EventEmitter {
 
         this.workers.delete(worker.id);
 
-        this.clusters.set(clusterID, Object.assign(cluster, {
-            workerID: newWorker.id
-        }));
+        this.clusters.set(clusterID, Object.assign(cluster, { workerID: newWorker.id }));
 
         this.workers.set(newWorker.id, clusterID);
 
-        logger.debug("Cluster Manager", `Reiniciando el grupo ${clusterID}`);
+        logger.debug("Cluster Manager", `Reiniciando Cluster ${clusterID}`);
 
         this.queue.queueItem({
-            item: clusterID,
-            value: {
+            item: clusterID, value: {
                 id: clusterID,
                 clusterCount: this.clusterCount,
                 name: "connect",
@@ -521,9 +502,8 @@ class ClusterManager extends EventEmitter {
     }
 
     async calculateShards() {
-       const shards = await Discord.Util.fetchRecommendedShards(this.token, { guildsPerShard: 1000 });
+        const shards = await Discord.Util.fetchRecommendedShards(this.token, { guildsPerShard: 1000 });
 
-        console.log(shards)
         if (shards === 1) {
             return Promise.resolve(shards);
         } else {
@@ -537,10 +517,7 @@ class ClusterManager extends EventEmitter {
     fetchInfo(start, type, value) {
         let cluster = this.clusters.get(start);
         if (cluster) {
-            master.workers[cluster.workerID].send({
-                name: type,
-                value: value
-            });
+            master.workers[cluster.workerID].send({ name: type, value: value });
             this.fetchInfo(start + 1, type, value);
         }
     }
